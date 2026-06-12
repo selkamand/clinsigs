@@ -20,11 +20,6 @@ clinsigs is a nextflow pipeline for detecting mutational signatures in cancer. I
 clinsigs should be run after fundamental cancer analyses (alignment, variant calling, etc) are performed with oncoanalyser or similar tools. clinsigs seeks to infer as many characteristics of the tumour as possible from an single patient multiome.
 
 
-> [!WARNING]
-> Do NOT expect API stability. This tool runs a frankly silly combination of analyses, from driver mutation analysis, mutational signatures, various gene-dysfunction classifiers, circos visualisations, etc. As we figure out whats useful and whats not, a cleaner pipeline will be established in a separate repo.
-
-If you're after cleaner implementations of these cancer analyses: check out the [sigverse](https://github.com/CCICB/sigverse) and [scarscape](https://github.com/CCICB/scarscape) that power some clinsigs analyses.
-
 ## Running the Pipeline
 
 Start with a samplesheet (csv) with the following columns (include a header row!)
@@ -50,6 +45,8 @@ nextflow run selkamand/clinsigs \
 ```
 
 Due to the number of parameters required by clinsigs we recommend configuring the run with a param.yaml file. An example is provided [here](params.yaml). Expect to spend some time configuring your reference datasets. You can absolutely run this pipeline on a single-sample, but you get a lot more out if you load up reference matrices.
+
+
 
 
 ## What does clinsigs do?
@@ -114,3 +111,6 @@ nextflow run selkamand/clinsigs -profile docker,test
 
 Replace docker with `singularity` / `apptainer` / etc. depending on your platform
 
+## Versions of Signature databases
+
+Cosmic signature databases will be included with 

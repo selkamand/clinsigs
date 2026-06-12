@@ -1,2 +1,2 @@
 sample,snv,sv,cnv,rnamut,meth,teal,bam
-tumor_sample,inputs/tumor_sample.purple.somatic.vcf.gz,inputs/tumor_sample.purple.sv.vcf.gz,,,,,
+COLO829v003T,tests/data/inputs/tumor_minimal.vcf,tests/data/inputs/tumor_sample.purple.sv.vcf.gz,,,,,

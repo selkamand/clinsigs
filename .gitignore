@@ -12,6 +12,7 @@ report.html
 dag.html
 .nf-test/
 .nf-test.log
+debug/
 
 # Optional: pipeline results (adjust if you want to keep them)
 results/

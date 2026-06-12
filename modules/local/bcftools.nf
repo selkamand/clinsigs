@@ -1,6 +1,10 @@
 #!/usr/bin/env nextflow
 nextflow.enable.types = true
 
+include { Clonality } from '../../types.nf'
+
+
+
 process BCFTOOLS_PASS {
 
     tag "${sample}"
@@ -21,7 +25,7 @@ process BCFTOOLS_PASS {
     """
     set -euo pipefail
 
-    bcftools view -f PASS ${vcf} > -Oz -o ${vcf.baseName}.pass.vcf.gz
+    bcftools view -f PASS ${vcf} -Oz -o ${vcf.baseName}.pass.vcf.gz
     """
 }
 
@@ -38,14 +42,14 @@ process BCFTOOLS_NORMALISE_INDELS_AND_SPLIT_MULTIALLELICS {
         vcf: Path
     )
     record(
-        ref_fa: Path,
+        reference_genome_fasta: Path,
         reference_genome_fai: Path
     )
 
     output:
     record(
         sample: sample,
-        vcf: file("${vcf.baseName}.normalise.vcf.gz"),
+        vcf: file("${vcf.baseName}.normalised.vcf.gz"),
     )
 
     script:
@@ -55,12 +59,10 @@ process BCFTOOLS_NORMALISE_INDELS_AND_SPLIT_MULTIALLELICS {
     bcftools norm \
         --multiallelic - \
         --check-ref e \
-        --verbose 1 \
         --output-type z \
         --output "${vcf.baseName}.normalised.vcf.gz" \
-        -f ${ref_fa} \
+        -f ${reference_genome_fasta} \
         ${vcf} 
-    -f PASS ${vcf} > -Oz -o ${vcf.baseName}.pass.vcf.gz
     """
 }
 
@@ -93,9 +95,40 @@ process SPLIT_PURPLE_SNVS_BY_CLONALITY {
     bcftools view ${vcf} -Oz -o ${vcf.baseName}.all.vcf.gz
     """
 }
-
 // Convert a PURPLE SNV VCF to a TSV file. 
 process PURPLE_SNV_VCF_TO_TSV {
+    tag "${sample}"
+
+    input:
+    record(
+        sample: String,
+        vcf: Path,
+        clonality: Clonality
+    )
+
+    output:
+    record(
+        sample: sample,
+        clonality: clonality,
+        tsv: file("${vcf.baseName}.tsv"),
+    )
+
+    script:
+    """
+    set -euo pipefail
+
+    # Note bcftools view is to isolate the tumour sample 
+    # (sometimes VCFs will include germline and tumour sample)
+    # Tumor sample name in VCF expected to match sample
+    bcftools view -s ${sample} ${vcf} | \
+    bcftools query \
+        -HH -f '%CHROM\t%POS\t%REF\t%ALT\t%FILTER\t%INFO/SUBCL\t%INFO/PURPLE_AF[\t%DP\t%AF]\n' \
+        > "${vcf.baseName}.tsv"
+    """
+}
+
+
+process PURPLE_SV_VCF_TO_BEDPE {
     tag "${sample}"
 
     input:
@@ -107,15 +140,13 @@ process PURPLE_SNV_VCF_TO_TSV {
     output:
     record(
         sample: sample,
-        tsv: file("${vcf.baseName}.tsv"),
+        bedpe: file("${vcf.baseName}.bedpe"),
     )
 
     script:
     """
     set -euo pipefail
 
-    bcftools query \
-    -f '%CHROM\t%POS\t%REF\t%ALT\t%FILTER\t%INFO/SUBCL\t%INFO/DP\t%INFO/PURPLE_AF\t%INFO/AF\n' \
-    ${vcf} > ${vcf.baseName}.tsv
+    svcf -i ${vcf} --from purple --to bedpe > "${vcf.baseName}.bedpe"
     """
 }
