@@ -15,8 +15,17 @@ include {
     BCFTOOLS_NORMALISE_INDELS_AND_SPLIT_MULTIALLELICS ;
     SPLIT_PURPLE_SNVS_BY_CLONALITY ;
     PURPLE_SNV_VCF_TO_TSV ;
-    PURPLE_SV_VCF_TO_BEDPE
+    PURPLE_SV_VCF_TO_BEDPE ;
+    PURPLE_SV_VCF_TO_BREAKEND_TSV
 } from './modules/local/bcftools.nf'
+
+include {
+    CLEAN_METHYLATION_TSV
+} from './modules/local/methylation.nf'
+
+include {
+    PREPROCESS_CNV_SEGMENTS
+} from './modules/local/copynumber.nf'
 
 include {
     Vartype ;
@@ -128,7 +137,12 @@ workflow FILTER_NORMALISE_SPLITCLONES {
     ch_rnamut_vcfs = ch_samples
         .filter { r -> r.rnamut != null }
         .map { r -> record(sample: r.sample, vcf: r.rnamut) }
-
+    ch_meth_tsv = ch_samples
+        .filter { r -> r.meth != null }
+        .map { r -> record(sample: r.sample, tsv: r.meth) }
+    ch_cnv_tsv = ch_samples
+        .filter { r -> r.cnv != null }
+        .map { r -> record(sample: r.sample, tsv: r.cnv) }
     // ch_cbv = ch_samples.map { r -> record(sample: r.sample, vcf: r.rnamut, vartype: Vartype.RNAmut) }
 
     // Filter and clonality split SNVS
@@ -157,24 +171,34 @@ workflow FILTER_NORMALISE_SPLITCLONES {
             file: r.bedpe,
         )
     }
+    // Convert PASS SVs into breakend-level TSV 
+    ch_sv_breakend_tsv = PURPLE_SV_VCF_TO_BREAKEND_TSV(ch_sv_pass)
+    ch_sv_breakend_tsv_with_vartype = ch_sv_breakend_tsv.map { r ->
+        record(
+            sample: r.sample,
+            vartype: Vartype.SV_BREAKENDS,
+            clonality: Clonality.all,
+            file: r.breakends_tsv,
+        )
+    }
 
-    // Pass along copynumber segment files (since we can't split by clonality)
-    ch_cnv_segments_with_vartype = ch_samples
-        .filter { r -> r.cnv != null }
-        .map { r ->
-            record(sample: r.sample, vartype: Vartype.CNV, clonality: Clonality.all, file: r.cnv)
-        }
 
+    //
+    // Pass along SEGMENT files (since we can't split by clonality)
+    ch_cnv_clean = PREPROCESS_CNV_SEGMENTS(ch_cnv_tsv)
+    ch_cnv_segments_with_vartype = ch_cnv_clean.map { r ->
+        record(sample: r.sample, vartype: Vartype.CNV, clonality: Clonality.all, file: r.tsv)
+    }
     // Pass along methylation files (since we can't split by clonality)
-    ch_meth_with_vartype = ch_samples
-        .filter { r -> r.meth != null }
-        .map { r ->
-            record(sample: r.sample, vartype: Vartype.METH, clonality: Clonality.all, file: r.meth)
-        }
+    ch_meth_clean = CLEAN_METHYLATION_TSV(ch_meth_tsv)
+    ch_meth_with_vartype = ch_meth_clean.map { r ->
+        record(sample: r.sample, vartype: Vartype.METH, clonality: Clonality.all, file: r.tsv)
+    }
 
     // Combine different variant types into one very long channel of longified records
     ch_long = ch_snv_tsvs_with_vartype
         .mix(ch_sv_bedpe_with_vartype)
+        .mix(ch_sv_breakend_tsv_with_vartype)
         .mix(ch_cnv_segments_with_vartype)
         .mix(ch_meth_with_vartype)
 

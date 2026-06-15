@@ -1,2 +1,2 @@
 sample,snv,sv,cnv,rnamut,meth,teal,bam
-COLO829v003T,tests/data/inputs/tumor_minimal.vcf,tests/data/inputs/tumor_sample.purple.sv.vcf.gz,,,,,
+COLO829v003T,tests/data/inputs/tumor_minimal.vcf,tests/data/inputs/tumor_sample.purple.sv.vcf.gz,tests/data/inputs/tumor_sample.copynumber.tsv,,tests/data/inputs/tumor_sample.methylation.tsv,,

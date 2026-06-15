@@ -147,6 +147,29 @@ process PURPLE_SV_VCF_TO_BEDPE {
     """
     set -euo pipefail
 
-    svcf -i ${vcf} --from purple --to bedpe > "${vcf.baseName}.bedpe"
+    bioprep svcf -i ${vcf} --from purple --to bedpe > "${vcf.baseName}.bedpe"
+    """
+}
+
+process PURPLE_SV_VCF_TO_BREAKEND_TSV {
+    tag "${sample}"
+
+    input:
+    record(
+        sample: String,
+        vcf: Path
+    )
+
+    output:
+    record(
+        sample: sample,
+        breakends_tsv: file("${vcf.baseName}.breakends.tsv"),
+    )
+
+    script:
+    """
+    set -euo pipefail
+
+    bioprep svcf -i ${vcf} --from purple --to breakends-tsv > "${vcf.baseName}.breakends.tsv"
     """
 }
