@@ -18,14 +18,14 @@ process BCFTOOLS_PASS {
     output:
     record(
         sample: sample,
-        vcf: file("${vcf.baseName}.pass.vcf.gz"),
+        vcf: file("${vcf.simpleName}.pass.vcf.gz"),
     )
 
     script:
     """
     set -euo pipefail
 
-    bcftools view -f PASS ${vcf} -Oz -o ${vcf.baseName}.pass.vcf.gz
+    bcftools view -f PASS ${vcf} -Oz -o ${vcf.simpleName}.pass.vcf.gz
     """
 }
 
@@ -49,7 +49,7 @@ process BCFTOOLS_NORMALISE_INDELS_AND_SPLIT_MULTIALLELICS {
     output:
     record(
         sample: sample,
-        vcf: file("${vcf.baseName}.normalised.vcf.gz"),
+        vcf: file("${vcf.simpleName}.normalised.vcf.gz"),
     )
 
     script:
@@ -60,7 +60,7 @@ process BCFTOOLS_NORMALISE_INDELS_AND_SPLIT_MULTIALLELICS {
         --multiallelic - \
         --check-ref e \
         --output-type z \
-        --output "${vcf.baseName}.normalised.vcf.gz" \
+        --output "${vcf.simpleName}.normalised.vcf.gz" \
         -f ${reference_genome_fasta} \
         ${vcf} 
     """
@@ -80,9 +80,9 @@ process SPLIT_PURPLE_SNVS_BY_CLONALITY {
     output:
     record(
         sample: sample,
-        all: file("${vcf.baseName}.all.vcf.gz"),
-        subclonal: file("${vcf.baseName}.subclonal.vcf.gz"),
-        clonal: file("${vcf.baseName}.clonal.vcf.gz"),
+        all: file("${vcf.simpleName}.all.vcf.gz"),
+        subclonal: file("${vcf.simpleName}.subclonal.vcf.gz"),
+        clonal: file("${vcf.simpleName}.clonal.vcf.gz"),
     )
 
     script:
@@ -90,9 +90,9 @@ process SPLIT_PURPLE_SNVS_BY_CLONALITY {
     set -euo pipefail
     
     # Get Subclonal / Clonal
-    bcftools view -i 'INFO/SUBCL < 0.3' ${vcf} -Oz -o ${vcf.baseName}.clonal.vcf.gz
-    bcftools view -e 'INFO/SUBCL < 0.3' ${vcf} -Oz -o ${vcf.baseName}.subclonal.vcf.gz
-    bcftools view ${vcf} -Oz -o ${vcf.baseName}.all.vcf.gz
+    bcftools view -i 'INFO/SUBCL < 0.3' ${vcf} -Oz -o ${vcf.simpleName}.clonal.vcf.gz
+    bcftools view -e 'INFO/SUBCL < 0.3' ${vcf} -Oz -o ${vcf.simpleName}.subclonal.vcf.gz
+    bcftools view ${vcf} -Oz -o ${vcf.simpleName}.all.vcf.gz
     """
 }
 // Convert a PURPLE SNV VCF to a TSV file. 
@@ -110,20 +110,14 @@ process PURPLE_SNV_VCF_TO_TSV {
     record(
         sample: sample,
         clonality: clonality,
-        tsv: file("${vcf.baseName}.tsv"),
+        tsv: file("${vcf.simpleName}.snv.${clonality}.tsv"),
     )
 
     script:
     """
     set -euo pipefail
 
-    # Note bcftools view is to isolate the tumour sample 
-    # (sometimes VCFs will include germline and tumour sample)
-    # Tumor sample name in VCF expected to match sample
-    bcftools view -s ${sample} ${vcf} | \
-    bcftools query \
-        -HH -f '%CHROM\t%POS\t%REF\t%ALT\t%FILTER\t%INFO/SUBCL\t%INFO/PURPLE_AF[\t%DP\t%AF]\n' \
-        > "${vcf.baseName}.tsv"
+    bioprep vcf -i ${vcf} --from purple --to tsv > ${vcf.simpleName}.snv.${clonality}.tsv
     """
 }
 
@@ -140,14 +134,14 @@ process PURPLE_SV_VCF_TO_BEDPE {
     output:
     record(
         sample: sample,
-        bedpe: file("${vcf.baseName}.bedpe"),
+        bedpe: file("${vcf.simpleName}.breakpoints.bedpelike.tsv"),
     )
 
     script:
     """
     set -euo pipefail
 
-    bioprep svcf -i ${vcf} --from purple --to bedpe > "${vcf.baseName}.bedpe"
+    bioprep svcf -i ${vcf} --from purple --to bedpe > "${vcf.simpleName}.breakpoints.bedpelike.tsv"
     """
 }
 
@@ -163,13 +157,13 @@ process PURPLE_SV_VCF_TO_BREAKEND_TSV {
     output:
     record(
         sample: sample,
-        breakends_tsv: file("${vcf.baseName}.breakends.tsv"),
+        breakends_tsv: file("${vcf.simpleName}.breakends.tsv"),
     )
 
     script:
     """
     set -euo pipefail
 
-    bioprep svcf -i ${vcf} --from purple --to breakends-tsv > "${vcf.baseName}.breakends.tsv"
+    bioprep svcf -i ${vcf} --from purple --to breakend-tsv > "${vcf.simpleName}.breakends.tsv"
     """
 }
