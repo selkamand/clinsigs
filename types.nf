@@ -11,3 +11,16 @@ enum Clonality {
     clonal,
     subclonal,
 }
+
+enum Scheme {
+    SBS6,
+    SBS96,
+    SBS1536,
+    DBS78,
+    ID83,
+    ID89_KOH,
+    CN48,
+    SV32,
+    RNA192,
+    IMMUNERECEPTOR,
+}

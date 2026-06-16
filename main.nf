@@ -29,7 +29,8 @@ include {
 
 include {
     Vartype ;
-    Clonality
+    Clonality ;
+    Scheme
 } from './types.nf'
 
 record InputRecord {
@@ -67,10 +68,23 @@ record ClonalityRecordLong {
 }
 
 
+record TallyAnalyses {
+    vartype: Vartype
+    scheme: Scheme
+}
+
+
+record TallyJobs {
+    sample: String
+    vartype: Vartype
+    clonality: Clonality
+    file: Path
+    scheme: Scheme
+}
+
 workflow {
 
     main:
-
     // Create reference record
     def reference_genome_fai = file("${params.reference_genome_fasta}.fai")
     if (!reference_genome_fai.exists()) {
@@ -79,6 +93,20 @@ workflow {
     def ref = record(
         reference_genome_fasta: params.reference_genome_fasta,
         reference_genome_fai: reference_genome_fai,
+    )
+
+    // Create Tally Analysis
+    def tally_schemes = channel.of(
+        record(vartype: Vartype.SNV, scheme: Scheme.SBS96),
+        record(vartype: Vartype.SNV, scheme: Scheme.SBS6),
+        record(vartype: Vartype.SNV, scheme: Scheme.SBS1536),
+        record(vartype: Vartype.SNV, scheme: Scheme.DBS78),
+        record(vartype: Vartype.SNV, scheme: Scheme.ID83),
+        record(vartype: Vartype.SNV, scheme: Scheme.ID89_KOH),
+        record(vartype: Vartype.CNV, scheme: Scheme.CN48),
+        record(vartype: Vartype.SV_BEDPE, scheme: Scheme.SV32),
+        record(vartype: Vartype.SV_BREAKENDS, scheme: Scheme.IMMUNERECEPTOR),
+        record(vartype: Vartype.RNAmut, scheme: Scheme.RNA192),
     )
 
     // Parse Samplesheet
@@ -104,21 +132,32 @@ workflow {
         }
 
 
-    // Split 
-    ch_split = FILTER_NORMALISE_SPLITCLONES(ch_samples, ref)
+    // Split and longify channel, adding Clonality and Vartype Fields
+    ch_split_longified = FILTER_NORMALISE_SPLITCLONES(ch_samples, ref)
 
     // Create a debug folder for our TSV descriptions of channels
     def debugfolder = file("${workflow.launchDir}/debug/")
     if (!debugfolder.exists()) {
         debugfolder.mkdirs()
     }
-    def longified_files = file("${debugfolder}/inputs_longified.tsv")
+    def longified_debugfile = file("${debugfolder}/inputs_longified.tsv")
 
-    longified_files.text = "sample\tvartype\tclonality\tfile"
-    ch_split.subscribe { r -> longified_files.append("\n${r.sample}\t${r.vartype}\t${r.clonality}\t${r.file.name}") }
+    longified_debugfile.text = "sample\tvartype\tclonality\tfile"
+    ch_split_longified.subscribe { r -> longified_debugfile.append("\n${r.sample}\t${r.vartype}\t${r.clonality}\t${r.file.name}") }
+
+    // Annotate tally schemes 
+    ch_with_tally_schemes = ch_split_longified.join(tally_schemes, by: 'vartype')
+
+    // Write plan for tally schemes to debug file
+    def tally_scheme_debugfile = file("${debugfolder}/classifications_planned.tsv")
+    tally_scheme_debugfile.text = "sample\tvartype\tclonality\tfile\tscheme"
+    ch_with_tally_schemes.subscribe { r -> tally_scheme_debugfile.append("\n${r.sample}\t${r.vartype}\t${r.clonality}\t${r.file.name}\t${r.scheme}") }
+
+    // Compute the actual tallies 
+    ch_tallies = RUN_TALLIES(ch_with_tally_schemes)
 
     publish:
-    preprocessed = ch_split
+    preprocessed = ch_split_longified
 }
 
 workflow FILTER_NORMALISE_SPLITCLONES {
@@ -224,7 +263,24 @@ workflow LONGIFY_CLONALITY {
     longified: Channel<ClonalityRecordLong>
 }
 
+workflow RUN_TALLIES {
+    take:
+    jobs: Channel<TallyJobs>
 
+    main:
+    cn48_results = CN48(jobs.filter { r -> r.scheme == 'CN48' })
+    sv32_results = SV32(jobs.filter { r -> r.scheme == 'SV32' })
+    sbs96_results = SBS96(jobs.filter { r -> r.scheme == 'SBS96' })
+    sbs6_results = SBS6(jobs.filter { r -> r.scheme == 'SBS6' })
+
+    results = cn48_results
+        .mix(sv32_results)
+        .mix(sbs96_results)
+        .mix(sbs6_results)
+
+    emit:
+    results
+}
 output {
     preprocessed {
         path { r -> "${params.outdir}/${r.sample}/${r.vartype}/${r.clonality}/" }

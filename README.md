@@ -72,6 +72,10 @@ There are two steps in mutsig analysis.
 2. **Fit** a model to tally matrices to predict which processes spawned those mutations.
 
 
+#### Step 1: Tallying Mutation Types 
+
+
+
 ### Signature Analysis (De novo discovery)
 
 Traditional de novo signature analysis requires a large cohort. 
